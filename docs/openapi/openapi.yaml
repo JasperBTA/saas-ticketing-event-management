@@ -1,0 +1,348 @@
+openapi: 3.0.3
+info:
+  title: SaaS Ticketing & Event Management Core API
+  description: >
+    Production REST API documentation for the SaaS Ticketing & Event Management platform (Codename: AnyPass).
+    Protected by stateless JWT authentication, OWASP ASVS security controls, and schema-per-tenant isolation.
+  version: 1.0.0
+servers:
+  - url: https://api.anypass.com/api/v1
+    description: Production Server
+  - url: http://localhost:8080/api/v1
+    description: Local Development Environment
+
+tags:
+  - name: Authentication
+    description: Login, MFA challenge verification, token rotation, and password lifecycle
+  - name: Events
+    description: Event scheduling, series cloning, exclusivity rules, and status management
+  - name: Products
+    description: Ticket configuration, validity windows, scan limits, and capacity quotas
+  - name: Skins
+    description: Graphical ticket layout templates and canvas configurations
+  - name: Users & Sessions
+    description: Operator account management, RBAC, and active session termination
+
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate user credentials
+      description: Issues HttpOnly JWT and Refresh Token cookies, or triggers an MFA challenge.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@anypass.com
+                password:
+                  type: string
+                  format: password
+                  maxLength: 128
+      responses:
+        '200':
+          description: Successfully authenticated (Cookies set)
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: jwt=eyJhbGciOi...; Path=/; HttpOnly; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Invalid input or credentials
+        '401':
+          description: Unauthorized
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Rotate refresh token & issue new JWT
+      description: Synchronized across client tabs using the Web Locks API to prevent race conditions.
+      responses:
+        '200':
+          description: Token rotated successfully
+        '401':
+          description: Invalid or expired refresh token
+
+  /events:
+    get:
+      tags: [Events]
+      summary: List all events in the current tenant schema
+      responses:
+        '200':
+          description: Array of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventResponse'
+    post:
+      tags: [Events]
+      summary: Create a new event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRequest'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '400':
+          description: Validation error
+
+  /events/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Events]
+      summary: Retrieve event details
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '404':
+          description: Event not found
+    put:
+      tags: [Events]
+      summary: Update event configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResponse'
+        '404':
+          description: Event not found
+    delete:
+      tags: [Events]
+      summary: Soft-delete event
+      description: Fails if tickets have already been scanned or sold (usedTickets > 0).
+      responses:
+        '204':
+          description: Event soft-deleted
+        '403':
+          description: Forbidden - Event has active ticket sales
+
+  /events/{id}/clone:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [Events]
+      summary: Clone an event to multiple calendar dates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newDates]
+              properties:
+                newDates:
+                  type: array
+                  maxItems: 366
+                  items:
+                    type: string
+                    format: date-time
+      responses:
+        '201':
+          description: Cloned events created in inactive state
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventResponse'
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List all products in tenant
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+    post:
+      tags: [Products]
+      summary: Create ticket product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: jwt
+
+  schemas:
+    EventRequest:
+      type: object
+      required: [name, date, location]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: Festival Open Air 2026
+        date:
+          type: string
+          format: date-time
+          example: '2026-10-15T18:00:00'
+        location:
+          type: string
+          maxLength: 255
+          example: National Stadium, Warsaw
+        enforceExclusivity:
+          type: boolean
+          default: false
+
+    EventResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        date:
+          type: string
+          format: date-time
+        location:
+          type: string
+        active:
+          type: boolean
+        usedTickets:
+          type: integer
+        enforceExclusivity:
+          type: boolean
+
+    ProductRequest:
+      type: object
+      required: [name, basePrice, validSince, maxEntries, entriesPerScan, productProfileId]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          example: VIP 3-Day Pass
+        basePrice:
+          type: number
+          format: decimal
+          minimum: 0
+          example: 249.99
+        validSince:
+          type: string
+          format: date
+          example: '2026-10-01'
+        validityDays:
+          type: integer
+          example: 30
+        maxEntries:
+          type: integer
+          example: 3
+        entriesPerScan:
+          type: integer
+          minimum: 1
+          example: 1
+        isLimited:
+          type: boolean
+          default: false
+        stockCap:
+          type: integer
+          nullable: true
+          example: 500
+        productProfileId:
+          type: string
+          format: uuid
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        basePrice:
+          type: number
+        active:
+          type: boolean
+        stockCap:
+          type: integer
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          example: ADMIN
+        permissions:
+          type: object
+          properties:
+            admin:
+              type: boolean
+            canScanTickets:
+              type: boolean
+            canUseCashRegister:
+              type: boolean
+            canModifyTickets:
+              type: boolean
