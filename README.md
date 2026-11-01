@@ -1,5 +1,11 @@
 # SaaS Ticketing & Event Management Platform
 
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
+[![Security](https://img.shields.io/badge/OWASP-ASVS_Level_2-red.svg)](https://owasp.org/www-project-application-security-verification-standard/)
+[![API Docs](https://img.shields.io/badge/API_Docs-Interactive_Swagger-blue.svg)](https://jasperbta.github.io/saas-ticketing-event-management/)
+
 Architecture and system design specification for a multi-tenant ticketing and event management backend.
 
 This repository documents the architectural patterns, database schemas, security lifecycle, and technical decisions implemented in the platform. The application source code is maintained in a private repository; this repository serves as a technical design reference.
@@ -123,10 +129,9 @@ Specific engineering trade-offs are documented as Architectural Decision Records
 
 ## API Specification
 
-The REST API interface is defined in OpenAPI 3.0 format:
-- Specification file: [`docs/openapi/openapi.yaml`](docs/openapi/openapi.yaml)
-
-The specification can be viewed via any OpenAPI-compliant viewer (e.g., Swagger Editor, Redoc, Stoplight).
+The REST API interface is fully documented using OpenAPI 3.0:
+- **Interactive Documentation (Live Swagger UI):** [https://jasperbta.github.io/saas-ticketing-event-management/](https://jasperbta.github.io/saas-ticketing-event-management/)
+- Raw specification file: [`docs/openapi/openapi.yaml`](docs/openapi/openapi.yaml)
 
 ---
 
